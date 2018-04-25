@@ -18,29 +18,19 @@ void debounce(){
 }
 
 uint16_t distancia = 0; // Em centímetros
+uint16_t inicio = 0; // Em us
 
 /* Interrupção executada quando echo sobe/desce */
 #pragma vector=TA0_CCR0_INT
 __interrupt void TA0_CCR0_ISR(){
 	if(TA0CCTL & SCCI){ // Valor da última captura
-		/* !TODO Como calcula distância com TA0CCR0? */
+		distancia = (TA0CCR0-inicio)/58; // 58 está em uma documentação
 	}
 	else {
+		inicio = TA0CCR0;
 		distancia = 0;
-		TA0CCTL |= (TACLR | MC__CONT); // Começa a contar no TA0
 	}
 	TA0CCTL0 &= ~CCIFG;
-}
-
-void geraSinalTrigger(){
-	
-	/* Faz trigger ser 1 por 10us */
-	TA1CCTL1 = OUTMOD_5; // Reset
-	TA1CCR1 = TRIGGER_TEMPO-1; // Ideal, conta de 0 a 9 (10us)
-	
-	/* Timer para trigger, saída */
-	TA1CCTL = (TACLR | TASSEL__SMCLK | MC__CONT);
-	
 }
 
 void main(void) {
@@ -50,11 +40,13 @@ void main(void) {
 	P2REN |= BIT1;  // Resistor de 
 	P2OUT |= BIT1;  // Pull-up
 	P2DIR &= ~BIT1; // Entrada
+				
+	/* Deve-se ligar o sinal de echo na porta P1.1 */
+	TA0CCTL0 = (CAP | CM_3 | CCIS_A | CCIE);
 	
-	/* Timer para echo, entrada
-	   Se for SMCLK, conta a cada 1us = 0,001ms: de 0ms a ~60ms 
-	 */
-	TA0CCTL = (TACLR | TASSEL__SMCLK | MC__HOLD);
+	/* Deve-se ligar o sinal de trigger na porta P1.2 */
+	TA0CCTL1 = OUTMOD_5; // Reset
+	TA0CCR1 = TRIGGER_TEMPO-1; // Conta 10us
 	
 	__enable_interrupt();
 	
@@ -62,12 +54,7 @@ void main(void) {
 		// Amostragem para S1
 		if(!(P2IN & BIT1)){
 			
-			geraSinalTrigger();
-			
-			TA1CCTL |= TACLR;
-			
-			/* Deve-se ligar o sinal de echo na porta P1.1 */
-			TA0CCTL0 = (CAP | CM_3 | CCIS_A | CCIE);
+			TA0CCTL |= (TACLR | TASSEL__SMCLK | MC__CONT); // Zera e configura timer A
 					
 			debounce();
 			while(!(P2IN & BIT1)); // Aguarda soltar
