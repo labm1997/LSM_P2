@@ -1,7 +1,7 @@
 #include <msp430.h>
 #include <stdint.h>
 #include <math.h>
-#include <stdio.h>
+//#include <stdio.h>
 
 /*
  * main.c
@@ -13,7 +13,7 @@
 #define TRIGGER_TEMPO 10     // us
 
 void debounce(){
-    volatile int i=1000000;
+    volatile uint16_t i=0xffff;
     while(i--);
 }
 
@@ -21,11 +21,11 @@ uint16_t distancia = 0; // Em centímetros
 uint16_t inicio = 0; // Em us
 
 /* Interrupção executada quando echo sobe/desce */
-#pragma vector=TA0_CCR0_INT
+#pragma vector=TIMER1_A0_VECTOR
 __interrupt void TA0_CCR0_ISR(){
-    if(TA0CCTL & SCCI){ // Valor da última captura
+    if(TA0CTL & SCCI){ // Valor da última captura
         distancia = (TA0CCR0-inicio)/58; // 58 está em uma documentação
-        printf("Resultado: %ucm\n", distancia);
+        //printf("Resultado: %ucm\n", distancia);
     }
     else {
         inicio = TA0CCR0;
@@ -43,7 +43,7 @@ void main(void) {
     P2DIR &= ~BIT1; // Entrada
                 
     /* Deve-se ligar o sinal de echo na porta P1.1 */
-    TA0CCTL0 = (CAP | CM_3 | CCIS_A | CCIE);
+    TA0CCTL0 = (CAP | CM_3 | CCIS_0 | CCIE);
     
     /* Deve-se ligar o sinal de trigger na porta P1.2 */
     TA0CCTL1 = OUTMOD_5; // Reset
@@ -55,7 +55,7 @@ void main(void) {
         // Amostragem para S1
         if(!(P2IN & BIT1)){
             
-            TA0CCTL |= (TACLR | TASSEL__SMCLK | MC__CONT); // Zera e configura timer A
+            TA0CTL |= (TACLR | TASSEL__SMCLK | MC__CONTINUOUS); // Zera e configura timer A
                     
             debounce();
             while(!(P2IN & BIT1)); // Aguarda soltar
