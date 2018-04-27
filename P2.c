@@ -21,7 +21,7 @@ uint16_t distancia = 0; // Em centímetros
 uint16_t inicio = 0; // Em us
 
 /* Interrupção executada quando echo sobe/desce */
-#pragma vector=TIMER1_A0_VECTOR
+#pragma vector=TIMER0_A0_VECTOR
 __interrupt void TA0_CCR0_ISR(){
     if(TA0CTL & SCCI){ // Valor da última captura
         distancia = (TA0CCR0-inicio)/58; // 58 está em uma documentação
