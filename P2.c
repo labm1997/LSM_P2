@@ -1,39 +1,27 @@
 #include <msp430.h>
 #include <stdint.h>
-#include <math.h>
-//#include <stdio.h>
+#define S1_DELAY 0xffff
+#define TRIGGER_TIME 10
 
-/*
- * main.c
- */
+uint16_t valorInicial;
 
-#define TA0_CCR0_INT 53
-#define VELOCIDADE_SOM 34000 // cm/s
-#define FREQUENCIA 1000000   // Hz
-#define TRIGGER_TEMPO 10     // us
-
-void debounce(){
-    volatile uint16_t i=0xffff;
-    while(i--);
+void delay(uint16_t time){
+    /* TA0 */
+    TA0CTL = (TACLR | MC__CONTINUOUS | TASSEL__SMCLK);
+    while(TA0R != time);
 }
 
-uint16_t distancia = 0; // Em centímetros
-uint16_t inicio = 0; // Em us
-
-/* Interrupção executada quando echo sobe/desce */
-#pragma vector=TIMER0_A0_VECTOR
-__interrupt void TA0_CCR0_ISR(){
-    if(TA0CTL & SCCI){ // Valor da última captura
-    
-        /* 58 está em uma documentação */
-        distancia = (TA0CCR0-inicio)/58;
+#pragma vector=TIMER1_A0_VECTOR
+__interrupt void TA1_CCR0_ISR(){
+    if(TA1CCTL0 & CCI) valorInicial = TA1CCR0; // Echo subiu
+    else {
+        uint16_t diferenca = TA1CCR0-valorInicial;
         
-        /* Muda estado dos LEDs */
-        if(distancia < 20) {
+        if(diferenca < 1160) {
             P1OUT |= BIT0;
             P4OUT &= ~BIT7;
         }
-        else if(distancia >= 20 && distancia <= 40) {
+        else if(diferenca >= 1160 && diferenca <= 2320) {
             P1OUT &= ~BIT0;
             P4OUT |= BIT7;
         }
@@ -41,54 +29,56 @@ __interrupt void TA0_CCR0_ISR(){
             P1OUT |= BIT0;
             P4OUT |= BIT7;
         }
-        
     }
-    else {
-        inicio = TA0CCR0;
-        distancia = 0;
-    }
-    TA0CCTL0 &= ~CCIFG;
+    TA1CCTL0 &= ~TAIFG;
 }
 
-void main(void) {
-    WDTCTL = WDTPW | WDTHOLD;    // Stop watchdog timer
+void main(){
+
+    /* S1 */
+    P2REN |=  BIT0;
+    P2OUT |=  BIT0; // Pull-up
+    P2DIR &= ~BIT0; // Entrada
     
-    /* Configura o botão S1 (P2.1) */
-    P2REN |= BIT1;  // Resistor de 
-    P2OUT |= BIT1;  // Pull-up
-    P2DIR &= ~BIT1; // Entrada
+    /* LED1 */
+    P1OUT &= ~BIT0;
+    P1DIR |=  BIT0; // Saída
     
-    /* Configura o LED vermelho */
-    P1OUT &= ~BIT0; // Desligado
-    P1DIR |= BIT0;  // Saída
+    /* LED2 */
+    P4OUT &= ~BIT7;
+    P4DIR |=  BIT7; // Saída
     
-    /* Configura o LED verde */
-    P4OUT &= ~BIT7; // Desligado
-    P4DIR |= BIT7;  // Saída
-                
-    /* Deve-se ligar o sinal de echo na porta P1.1 */
-    TA0CCTL0 = (CAP | CM_3 | CCIS_0 | CCIE);
+    /* P1.7 (TA1.0)*/
+    P1SEL |=  BIT7; // Funcionalidade dedicada
+    P1DIR &= ~BIT7; // Entrada
     
+    /* P2.0 (TA1.1) */
+    P2SEL |=  BIT0; // Funcionalidade dedicada
+    P2DIR |=  BIT0; // Saída
     
     __enable_interrupt();
     
     while(1){
-        // Amostragem para S1
-        if(!(P2IN & BIT1)){
+        if(!(P2IN & BIT0)){
+        
+            /* TA1 */
+            TA1CTL = (TACLR | MC__STOP | TASSEL__SMCLK);
             
-            /* Zera e configura timer A */
-            TA0CTL |= (TACLR | TASSEL__SMCLK | MC__CONTINUOUS);
+            /* TA1.0 (echo) */
+            TA1CCTL0 = (CAP | CM_3 | CCIS_0 | CCIE);
             
-            /* Deve-se ligar o sinal de trigger na porta P1.2 */
-            TA0CCTL1 = OUTMOD_5; // Reset
-            TA0CCR1 = TRIGGER_TEMPO-1; // Conta 10us
+            /* Inicia contagem */
+            TA1CTL |= MC__CONTINUOUS;
             
-            debounce();
-            while(!(P2IN & BIT1)); // Aguarda soltar
-            debounce();
+            /* TA1.1 (trigger) */
+            TA1CCTL1 = OUTMOD_5; // Modo reset
+            TA1CCR1 = TRIGGER_TIME-1;
             
+            /* Debounce */
+            delay(S1_DELAY);
+            while(!(P2IN & BIT0));
+            delay(S1_DELAY);
         }
     }
     
 }
-
