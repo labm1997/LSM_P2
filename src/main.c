@@ -14,11 +14,11 @@ void delay(uint16_t time){
     while(TA0R != time);
 }
 
-#pragma vector=TIMER1_A0_VECTOR
-__interrupt void TA1_CCR0_ISR(){
-    if(TA1CCTL0 & CCI) valorInicial = TA1CCR0; // Echo subiu
-    else {
-        uint16_t diferenca = TA1CCR0-valorInicial;
+#pragma vector=TIMER2_A0_VECTOR
+__interrupt void TA2_CCR0_ISR(){
+    if(TA2CCTL0 & CCI) valorInicial = TA2CCR0; // Echo subiu
+    else {        
+        uint16_t diferenca = TA2CCR0-valorInicial;
         
         if(diferenca < 1160) {
             P1OUT |= BIT0;
@@ -33,7 +33,7 @@ __interrupt void TA1_CCR0_ISR(){
             P4OUT |= BIT7;
         }
     }
-    TA1CCTL0 &= ~TAIFG;
+    TA2CCTL0 &= ~TAIFG;
 }
 
 
@@ -55,9 +55,9 @@ void main()
 	
 	
     /* S1 */
-    P2REN |=  BIT0;
-    P2OUT |=  BIT0; // Pull-up
-    P2DIR &= ~BIT0; // Entrada
+    P2REN |=  BIT1;
+    P2OUT |=  BIT1; // Pull-up
+    P2DIR &= ~BIT1; // Entrada
     
     /* LED1 */
     P1OUT &= ~BIT0;
@@ -67,35 +67,42 @@ void main()
     P4OUT &= ~BIT7;
     P4DIR |=  BIT7; // Saída
     
-    /* P1.7 (TA1.0)*/
-    P1SEL |=  BIT7; // Funcionalidade dedicada
-    P1DIR &= ~BIT7; // Entrada
+    /* P2.3 (TA2.0)*/
+    P2SEL |=  BIT3; // Funcionalidade dedicada
+    P2DIR &= ~BIT3; // Entrada
     
-    /* P2.0 (TA1.1) */
-    P2SEL |=  BIT0; // Funcionalidade dedicada
-    P2DIR |=  BIT0; // Saída
+    /* P2.4 (TA2.1) */
+    //P2SEL |= BIT4; 
+    P2DIR |=  BIT4; // Saída
+    P2OUT &= ~BIT4;
     
     __enable_interrupt();
     
     while(1){
-        if(!(P2IN & BIT0)){
-        
-            /* TA1 */
-            TA1CTL = (TACLR | MC__STOP | TASSEL__SMCLK);
+        if(!(P2IN & BIT1)){
             
-            /* TA1.0 (echo) */
-            TA1CCTL0 = (CAP | CM_3 | CCIS_0 | CCIE);
+            /* Zera os LEDs */
+            P1OUT &= ~BIT0;
+            P4OUT &= ~BIT7;
             
-            /* Inicia contagem */
-            TA1CTL |= MC__CONTINUOUS;
+            /* TA2.0 (echo) */
+            TA2CCTL0 = (CAP | CM_3 | CCIS_0 | CCIE);
             
-            /* TA1.1 (trigger) */
-            TA1CCTL1 = OUTMOD_5; // Modo reset
-            TA1CCR1 = TRIGGER_TIME-1;
+            /* TA2 */
+            TA2CTL = (TACLR | MC__CONTINUOUS | TASSEL__SMCLK);
+            
+            /* Manda o trigger */
+            P2OUT |= BIT4;
+            delay(TRIGGER_TIME-1);
+            P2OUT &= ~BIT4;
+            
+            /* Manda o trigger */
+/*            TA2CCR1 = TRIGGER_TIME-1;*/
+/*            TA2CCTL1 |= OUTMOD_5;*/
             
             /* Debounce */
             delay(S1_DELAY);
-            while(!(P2IN & BIT0));
+            while(!(P2IN & BIT1));
             delay(S1_DELAY);
         }
     }

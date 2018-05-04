@@ -2,7 +2,7 @@ IDIR=include
 SDIR=src
 ODIR=obj
 CC=msp430-gcc
-CFLAGS=-I $(IDIR) -mmcu=msp430f5529
+CFLAGS=-I $(IDIR) -mmcu=msp430f5529 -mdisable-watchdog
 LIBS=
 
 # Dependências
